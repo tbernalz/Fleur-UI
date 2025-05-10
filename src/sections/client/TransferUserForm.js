@@ -43,7 +43,7 @@ export default function TransferUserForm() {
       const selectedOperator = operators.find((operator) => operator.operatorName === formData.documentType);
       if (selectedOperator) {
         const data = {
-          operatorId: selectedOperator._id,
+          externalOperatorId: selectedOperator._id,
         };
         try {
           const response = await thestralTransfer.transfer(data);

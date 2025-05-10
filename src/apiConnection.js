@@ -1,7 +1,8 @@
 import { enqueueSnackbar } from 'notistack'; // Import enqueueSnackbar
 import axios from 'axios';
 
-const baseUrl = process.env.REACT_APP_API_BASE_URL;
+// const baseUrl = process.env.REACT_APP_API_BASE_URL;
+const baseUrl = 'http://api.the-chamber-of-secrets.me/';
 const axiosInstance = axios.create({
   baseURL: baseUrl,
   headers: {
@@ -19,9 +20,9 @@ axiosInstance.interceptors.request.use(
   (config) => {
     // Modify the request config to include CORS headers
 
-    // config.headers['Access-Control-Allow-Origin'] = '*';
-    // config.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE';
-    // config.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization';
+    config.headers['Access-Control-Allow-Origin'] = '*';
+    config.headers['Access-Control-Allow-Methods'] = '*';
+    config.headers['Access-Control-Allow-Headers'] = '*';
     return config;
   },
   (error) => {

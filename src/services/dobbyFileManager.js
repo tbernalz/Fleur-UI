@@ -6,12 +6,12 @@ class DobbyFileManager {
   }
 
   registerUser(userDto) {
-    return this.axios.post('/User', userDto);
+    return this.axios.post('/user', userDto);
   }
 
   async uploadFileSignedUrl(dataToSend) {
     try {
-      const response = await this.axios.post('/File/upload-file-signed-url', dataToSend, {
+      const response = await this.axios.post('/file/upload-file-signed-url', dataToSend, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
         },
@@ -38,7 +38,7 @@ class DobbyFileManager {
 
   async getFiles(pageIndex, pageSize) {
     try {
-      const response = await this.axios.get(`/File/get-files?pageIndex=${pageIndex}&pageSize=${pageSize}`, {
+      const response = await this.axios.get(`/file/get-files?pageIndex=${pageIndex}&pageSize=${pageSize}`, {
         headers: {
           pageIndex,
           pageSize,
@@ -53,7 +53,7 @@ class DobbyFileManager {
 
   async getFileUrl(fileId) {
     try {
-      const response = await this.axios.get(`/File/get-file-url?fileId=${fileId}`, {
+      const response = await this.axios.get(`/file/get-file-url?fileId=${fileId}`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
         },

@@ -6,15 +6,16 @@ class LockhartUsersApi {
   }
 
   checkEmailExistence(email) {
-    return this.axios.get(`/User/check-email?email=${email}`);
+    return this.axios.get(`/user/check-email?email=${email}`);
   }
 
   checkIdentificationNumberExistence(identificationNumber) {
-    return this.axios.get(`/User/check-document-number?identificationNumber=${identificationNumber}`);
+    return this.axios.get(`/user/check-document-number?identificationNumber=${identificationNumber}`);
   }
 
   registerUser(userDto) {
-    return this.axios.post('/User/verify', userDto);
+    console.log(userDto);
+    return this.axios.post('/user/verify', userDto);
   }
 }
 

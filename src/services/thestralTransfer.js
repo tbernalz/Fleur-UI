@@ -1,3 +1,4 @@
+import { jwtDecode } from 'jwt-decode';
 import axios from '../apiConnection';
 
 class ThestralTransfer {
@@ -7,7 +8,7 @@ class ThestralTransfer {
 
   async getOperators() {
     try {
-      const response = await this.axios.get(`/Operator/List`);
+      const response = await this.axios.get(`/api/Operator`);
       return response;
     } catch (error) {
       throw new Error('Error al obtener los operadores');
@@ -16,9 +17,18 @@ class ThestralTransfer {
 
   async transfer(dataToSend) {
     try {
-      const response = await this.axios.post(`/Transfer/transfer-user`, dataToSend, {
+      const token = localStorage.getItem('accessToken');
+      const decoded = jwtDecode(token);
+      const userId = decoded.user_id;
+      const userEmail = decoded.email;
+
+      console.log('User ID:', userId);
+      console.log('User Email:', userEmail);
+
+      const response = await this.axios.post(`/api/Transfer`, dataToSend, {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
+          'X-User-Email': userEmail,
+          'X-User-Id': userId,
         },
       });
       return response;
