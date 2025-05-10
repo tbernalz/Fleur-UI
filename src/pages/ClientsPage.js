@@ -1,345 +1,196 @@
-import { Helmet } from 'react-helmet-async';
-import { filter } from 'lodash';
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
-  Card,
-  Table,
-  Stack,
-  Paper,
-  Button,
-  Popover,
-  Checkbox,
-  TableRow,
-  MenuItem,
-  TableBody,
-  TableCell,
   Container,
   Typography,
-  IconButton,
-  TableContainer,
+  Table,
+  TableHead,
+  TableRow,
+  TableCell,
+  TableBody,
   TablePagination,
-  CircularProgress, // Importación del CircularProgress para el indicador de carga
+  Button,
+  CircularProgress,
+  Paper,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  List,
+  ListItem,
+  ListItemText,
+  Input,
+  IconButton,
 } from '@mui/material';
-import Iconify from '../components/iconify';
-import Scrollbar from '../components/scrollbar';
-import DobbyFileManagerApi from '../services/dobbyFileManager';
-import { UserListHead, UserListToolbar } from '../sections/@dashboard/user';
+import { CloudDownload, Delete } from '@mui/icons-material';
 
-const TABLE_HEAD = [
-  { id: 'name', label: 'Nombre', alignRight: false },
-  { id: 'format', label: 'Formato', alignRight: false },
-  { id: 'category', label: 'Categoria', alignRight: false },
-  { id: 'uploadTime', label: 'Fecha de creación', alignRight: false },
-  { id: 'view', label: 'Ver archivo', alignRight: true },
-  { id: '' },
-];
+import DobbyFileManager from '../services/dobbyFileManager';
 
-function descendingComparator(a, b, orderBy) {
-  if (b[orderBy] < a[orderBy]) {
-    return -1;
-  }
-  if (b[orderBy] > a[orderBy]) {
-    return 1;
-  }
-  return 0;
-}
-
-function getComparator(order, orderBy) {
-  return order === 'desc'
-    ? (a, b) => descendingComparator(a, b, orderBy)
-    : (a, b) => -descendingComparator(a, b, orderBy);
-}
-
-function applySortFilter(array, comparator, query) {
-  const stabilizedThis = array.map((el, index) => [el, index]);
-  stabilizedThis.sort((a, b) => {
-    const order = comparator(a[0], b[0]);
-    if (order !== 0) return order;
-    return a[1] - b[1];
-  });
-  if (query) {
-    return filter(array, (_user) => _user.name.toLowerCase().indexOf(query.toLowerCase()) !== -1);
-  }
-  return stabilizedThis.map((el) => el[0]);
-}
-
-export default function UserPage() {
-  const navigate = useNavigate();
-
-  const [open, setOpen] = useState(null);
+export default function FileManager() {
+  const [idCitizen, setIdCitizen] = useState(null);
+  const [files, setFiles] = useState([]);
+  const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(0);
-  const [order, setOrder] = useState('asc');
-  const [selected, setSelected] = useState([]);
-  const [orderBy, setOrderBy] = useState('name');
-  const [filterName, setFilterName] = useState('');
   const [rowsPerPage, setRowsPerPage] = useState(5);
-  const [clients, setClients] = useState([]);
-  const [totalPages, setTotalPages] = useState(0);
-  const [currentUserId, setCurrentUserId] = useState(null);
-  const [loading, setLoading] = useState(false); // Estado para controlar la carga
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [selectedFiles, setSelectedFiles] = useState([]);
+  const [metadataArray, setMetadataArray] = useState([]);
 
-  const fetchClients = async (page, pageSize) => {
+  const fetchFiles = async () => {
+    if (!idCitizen) return;
+    setLoading(true);
     try {
-      setLoading(true); // Activar la carga antes de la solicitud
-      const response = await DobbyFileManagerApi.getFiles(page, pageSize);
-      const { data, headers } = response;
-      const { 'x-pagination-total-pages': total, 'x-pagination-has-next-page': hasNext } = headers;
-      if (hasNext) {
-        setTotalPages(total);
-      } else {
-        setTotalPages(1);
-      }
-      setClients(data);
-    } catch (error) {
-      console.error('Error fetching clients:', error);
+      const res = await DobbyFileManager.listDocuments(idCitizen);
+      setFiles(res.files || []);
+    } catch (err) {
+      console.error('Error al obtener archivos', err);
     } finally {
-      setLoading(false); // Desactivar la carga después de la solicitud (tanto en éxito como en error)
+      setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchClients(page, rowsPerPage);
-  }, [page, rowsPerPage]);
+    const getIdCitizen = async () => {
+      try {
+        const id = await DobbyFileManager.getMe();
+        setIdCitizen(id);
+      } catch (error) {
+        console.error('Error al obtener el idCitizen', error);
+      }
+    };
+    getIdCitizen();
+  }, []);
 
-  const handleOpenMenu = (event, selectedUser) => {
-    setOpen(event.currentTarget);
-    setCurrentUserId(selectedUser.id);
-  };
+  useEffect(() => {
+    if (idCitizen) {
+      fetchFiles();
+    }
+  }, [idCitizen]);
 
-  const handleCloseMenu = () => {
-    setOpen(null);
-    setCurrentUserId(null);
-  };
-
-  const handleEditUser = () => {
-    if (currentUserId) {
-      navigate(`/dashboard/clientes/editar/${currentUserId}`);
+  const handleDelete = async (fileName) => {
+    try {
+      await DobbyFileManager.deleteFile(fileName);
+      alert('Archivo eliminado correctamente');
+      fetchFiles();
+    } catch (err) {
+      console.error('Error al eliminar archivo', err);
     }
   };
 
-  const handleRequestSort = (event, property) => {
-    const isAsc = orderBy === property && order === 'asc';
-    setOrder(isAsc ? 'desc' : 'asc');
-    setOrderBy(property);
+  const handleDownload = (fileName) => {
+    DobbyFileManager.downloadFile(fileName);
   };
 
-  const handleSelectAllClick = (event) => {
-    if (event.target.checked) {
-      const newSelecteds = clients.map((n) => n.name);
-      setSelected(newSelecteds);
-    } else {
-      setSelected([]);
+  const handleFileChange = (event) => {
+    const files = Array.from(event.target.files);
+    const metadata = files.map((file) => ({
+      operatorId: '1728',
+      fileName: file.name,
+      mimetype: file.type,
+      size: file.size,
+    }));
+
+    setSelectedFiles(files);
+    setMetadataArray(metadata);
+  };
+
+  const handleUpload = async () => {
+    if (!selectedFiles.length) return;
+    try {
+      setLoading(true);
+      const res = await DobbyFileManager.uploadFiles(selectedFiles, metadataArray);
+      alert(res.message || 'Archivos subidos');
+      fetchFiles();
+      setUploadDialogOpen(false);
+      setSelectedFiles([]);
+    } catch (err) {
+      console.error('Error al subir archivos', err);
+      alert('Error al subir archivos');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleClick = (event, name) => {
-    const selectedIndex = selected.indexOf(name);
-    let newSelected = [];
-    if (selectedIndex === -1) {
-      newSelected = newSelected.concat(selected, name);
-    } else if (selectedIndex === 0) {
-      newSelected = newSelected.concat(selected.slice(1));
-    } else if (selectedIndex === selected.length - 1) {
-      newSelected = newSelected.concat(selected.slice(0, -1));
-    } else if (selectedIndex > 0) {
-      newSelected = newSelected.concat(selected.slice(0, selectedIndex), selected.slice(selectedIndex + 1));
-    }
-    setSelected(newSelected);
-  };
-
-  const handleChangePage = (event, newPage) => {
-    setPage(newPage);
-  };
-
+  const handleChangePage = (event, newPage) => setPage(newPage);
   const handleChangeRowsPerPage = (event) => {
     setRowsPerPage(parseInt(event.target.value, 10));
     setPage(0);
   };
 
-  const handleFilterByName = (event) => {
-    setFilterName(event.target.value);
-    setPage(0);
-  };
-
-  const mapCategoryValue = (categoryName) => {
-    switch (categoryName) {
-      case 0:
-        return 'Identidad';
-      case 1:
-        return 'Salud';
-      case 2:
-        return 'Estudio';
-      case 3:
-        return 'Vivienda';
-      case 4:
-        return 'Otros';
-      default:
-        return 'Sin categoria';
-    }
-  };
-
-  const filteredUsers = applySortFilter(clients, getComparator(order, orderBy), filterName);
-
-  const isNotFound = !filteredUsers.length && !!filterName;
-
-  const handleViewFile = (fileId) => {
-    navigate(`/dashboard/files/view?id=${fileId}`);
-  };
-
   return (
-    <>
-      <Helmet>
-        <title>Archivos | The Chamber of Secrets</title>
-      </Helmet>
+    <Container sx={{ mt: 4 }}>
+      <Typography variant="h4" gutterBottom>
+        Gestión de Archivos
+      </Typography>
+      <Button variant="contained" onClick={() => setUploadDialogOpen(true)} sx={{ mb: 2 }}>
+        Agregar Archivos
+      </Button>
 
-      <Container>
-        <Stack direction="row" alignItems="center" justifyContent="space-between" mb={5}>
-          <Typography variant="h4" gutterBottom>
-            Archivos
-          </Typography>
-          <Button
-            variant="contained"
-            startIcon={<Iconify icon="eva:plus-fill" />}
-            onClick={() => navigate(`/dashboard/files/new`)}
-          >
-            Nuevo Archivo
-          </Button>
-        </Stack>
-
-        <Card>
-          <UserListToolbar numSelected={selected.length} filterName={filterName} onFilterName={handleFilterByName} />
-
-          <Scrollbar>
-            <TableContainer sx={{ minWidth: 800 }}>
-              <Table>
-                <UserListHead
-                  order={order}
-                  orderBy={orderBy}
-                  headLabel={TABLE_HEAD}
-                  rowCount={clients.length}
-                  numSelected={selected.length}
-                  onRequestSort={handleRequestSort}
-                  onSelectAllClick={handleSelectAllClick}
-                />
-
-                <TableBody>
-                  {applySortFilter(clients, getComparator(order, orderBy), filterName).map((row) => {
-                    const { id, name, format, category, uploadTime } = row;
-                    const selectedUser = selected.indexOf(name) !== -1;
-                    return (
-                      <TableRow hover key={id} tabIndex={-1} role="checkbox" selected={selectedUser}>
-                        <TableCell padding="checkbox">
-                          <Checkbox checked={selectedUser} onChange={(event) => handleClick(event, name)} />
-                        </TableCell>
-
-                        <TableCell component="th" scope="row" padding="none">
-                          <Stack direction="row" alignItems="center" spacing={2}>
-                            <Typography variant="subtitle2" noWrap>
-                              {name}
-                            </Typography>
-                          </Stack>
-                        </TableCell>
-
-                        <TableCell align="left">{format}</TableCell>
-
-                        <TableCell align="left">{mapCategoryValue(category)}</TableCell>
-
-                        <TableCell align="left">{uploadTime}</TableCell>
-
-                        <TableCell align="right">
-                          <IconButton size="large" color="inherit" onClick={() => handleViewFile(row.id)}>
-                            <Iconify icon={'eva:eye-fill'} />
-                          </IconButton>
-                        </TableCell>
-
-                        <TableCell align="right">
-                          <IconButton size="large" color="inherit" onClick={(e) => handleOpenMenu(e, row)}>
-                            <Iconify icon={'eva:more-vertical-fill'} />
-                          </IconButton>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-
-                {isNotFound && (
-                  <TableBody>
-                    <TableRow>
-                      <TableCell align="center" colSpan={6} sx={{ py: 3 }}>
-                        <Paper
-                          sx={{
-                            textAlign: 'center',
-                          }}
-                        >
-                          <Typography variant="h6" paragraph>
-                            No encontrado
-                          </Typography>
-
-                          <Typography variant="body2">
-                            No existen resultados para &nbsp;
-                            <strong>&quot;{filterName}&quot;</strong>.
-                            <br /> Intenta revisar las erratas o utilizar palabras completas.
-                          </Typography>
-                        </Paper>
-                      </TableCell>
-                    </TableRow>
-                  </TableBody>
-                )}
-              </Table>
-            </TableContainer>
-          </Scrollbar>
-
+      {loading ? (
+        <CircularProgress />
+      ) : files.length === 0 ? (
+        <Typography>No tienes archivos.</Typography>
+      ) : (
+        <Paper>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell>Nombre</TableCell>
+                <TableCell>Tipo</TableCell>
+                <TableCell>Fecha</TableCell>
+                <TableCell align="right">Acciones</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {files.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((file, index) => (
+                <TableRow key={index}>
+                  <TableCell>{file.name}</TableCell>
+                  <TableCell>{file.contentType}</TableCell>
+                  <TableCell>{file.timeCreated}</TableCell>
+                  <TableCell align="right">
+                    <IconButton color="primary" onClick={() => handleDownload(file.name)} sx={{ mr: 1 }}>
+                      <CloudDownload />
+                    </IconButton>
+                    <IconButton color="error" onClick={() => handleDelete(file.name)}>
+                      <Delete />
+                    </IconButton>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
           <TablePagination
-            rowsPerPageOptions={[5, 10, 25]}
             component="div"
-            count={totalPages * rowsPerPage}
-            rowsPerPage={rowsPerPage}
+            count={files.length}
             page={page}
             onPageChange={handleChangePage}
+            rowsPerPage={rowsPerPage}
             onRowsPerPageChange={handleChangeRowsPerPage}
+            rowsPerPageOptions={[5, 10, 25]}
           />
-        </Card>
-      </Container>
-
-      <Popover
-        open={Boolean(open)}
-        anchorEl={open}
-        onClose={handleCloseMenu}
-        anchorOrigin={{ vertical: 'top', horizontal: 'left' }}
-        transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-        PaperProps={{
-          sx: {
-            p: 1,
-            width: 140,
-            '& .MuiMenuItem-root': {
-              px: 1,
-              typography: 'body2',
-              borderRadius: 0.75,
-            },
-          },
-        }}
-      >
-        <MenuItem
-          onClick={() => {
-            handleEditUser();
-          }}
-        >
-          <Iconify icon={'eva:edit-fill'} sx={{ mr: 2 }} />
-          Editar
-        </MenuItem>
-
-        <MenuItem sx={{ color: 'error.main' }}>
-          <Iconify icon={'eva:trash-2-outline'} sx={{ mr: 2 }} />
-          Eliminar
-        </MenuItem>
-      </Popover>
-
-      {loading && ( // Mostrar indicador de carga si loading es verdadero
-        <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }}>
-          <CircularProgress />
-        </div>
+        </Paper>
       )}
-    </>
+
+      <Dialog open={uploadDialogOpen} onClose={() => setUploadDialogOpen(false)}>
+        <DialogTitle>Subir Archivos</DialogTitle>
+        <DialogContent>
+          <Input type="file" inputProps={{ multiple: true }} onChange={handleFileChange} />
+          {selectedFiles.length > 0 && (
+            <List>
+              {selectedFiles.map((file, idx) => (
+                <ListItem key={idx}>
+                  <ListItemText primary={file.name} />
+                </ListItem>
+              ))}
+            </List>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setUploadDialogOpen(false)}>Cancelar</Button>
+          <Button variant="contained" onClick={handleUpload}>
+            Subir
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Container>
   );
 }
